@@ -1,0 +1,29 @@
+# render.yaml (Versión Final sin buildArgs)
+
+services:
+  - type: web
+    name: backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    buildCommand: npm install
+    healthCheckPath: /
+    plan: free
+    envVars:
+      - key: MONGODB_URI
+        sync: false 
+      - key: JWT_SECRET
+        value: unSecretoMuySegurO123! # <<< ¡IMPORTANTE! REEMPLAZA
+      - key: PORT
+        value: "10000" 
+
+  - type: web
+    name: frontend
+    env: docker
+    dockerfilePath: ./frontend/Dockerfile
+    buildCommand: npm install && npm run build
+    plan: free
+    envVars:
+      - key: VITE_BACKEND_URL
+        value: https://backend-8dew.onrender.com/ # URL pública del backend
+    # buildArgs: # <--- ¡ELIMINA ESTA SECCIÓN COMPLETA!
+    #   - VITE_BACKEND_URL

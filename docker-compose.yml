@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+
+  backend:
+    build: 
+      context: ./backend
+    env_file:
+      - .env
+    ports:
+      - '3000:3000'
+  frontend:
+    build:
+      context: ./frontend
+    env_file:
+      - .env
+    ports:
+      - '5173:5173'
+    command: npm run dev
+    depends_on:
+      - backend
+
+# (No necesitas volumes si no montas mongo localmente.)

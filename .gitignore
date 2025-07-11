@@ -1,0 +1,28 @@
+# Node modules
+**/node_modules/
+
+# Variables de entorno
+.env
+**/.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# Carpetas de build/dist
+/frontend/dist/
+/backend/build/
+
+# Docker
+.dockerignore
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDEs/editors
+.vscode/
+.idea/
+
+# Cobertura de tests
+coverage/

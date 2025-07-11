@@ -1,0 +1,411 @@
+/* global.css */
+
+/* Reseteo de layout */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  overflow-x: visible;
+}
+
+
+/* ---------- TOOLBAR REDISEÑADA ---------- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1rem;
+  height: 5rem;
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar button {
+  flex-shrink: 0;
+  font-size: 2rem;
+  padding: 6px;
+  background: none;
+  border: none;
+  border-radius: 0.375rem;
+  transition: background-color 0.2s, transform 0.1s;
+  cursor: pointer;
+}
+
+.toolbar button:hover {
+  background-color: #e2e8f0;
+  transform: translateY(-1px);
+}
+
+.toolbar button:active {
+  transform: translateY(0);
+}
+
+.toolbar button.active {
+  background-color: #3b82f6;
+  color: #ffffff;
+}
+
+/* Spacer flexible */
+.flex-spacer {
+  flex-grow: 1;
+}
+
+/* ---------- CHAT SIDEBAR REDISEÑADA ---------- */
+.chat-sidebar {
+  position: absolute;
+  top: 5rem;
+  right: 0;
+  width: 320px;
+  height: calc(100% - 5rem);
+  background: #ffffff;
+  border-left: 1px solid #e5e7eb;
+  box-shadow: -4px 0 6px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header {
+  padding: 0.75rem 1rem;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chat-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.chat-header button {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.chat-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chat-list li {
+  max-width: 80%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  line-height: 1.4;
+  font-size: 0.875rem;
+}
+
+.chat-list li.other {
+  align-self: flex-start;
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+.chat-list li.mine {
+  align-self: flex-end;
+  background-color: #3b82f6;
+  color: #ffffff;
+}
+
+.chat-form {
+  display: flex;
+  padding: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.chat-form input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem 0 0 0.5rem;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.chat-form input:focus {
+  border-color: #3b82f6;
+}
+
+.chat-form button {
+  padding: 0 1rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0 0.5rem 0.5rem 0;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.chat-form button:hover {
+  background-color: #2563eb;
+}
+
+
+
+
+/* ---------- SVG GRID ---------- */
+svg {
+  background: #f3f4f6;
+}
+
+
+
+.toolbar button {
+
+  background-color: #f0f0f0; 
+  color: #333; 
+  border: 1px solid #ccc; 
+
+}
+
+
+/* Estilos para el popover de figuras (CONTENEDOR EXTERNO) */
+.shapes-popover {
+    /* Mantenemos solo las propiedades de apariencia del popover en sí */
+    /* Ya no es un grid. Su tamaño se adaptará al contenido del .shapes-grid */
+    padding: 12px !important; 
+    background-color: #fff !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+    border: 1px solid #e0e0e0 !important;
+    /* Elimina de aquí: display, grid-template-columns, gap, width, min-width, max-width */
+}
+
+/* ESTE ES EL BLOQUE CRUCIAL: Estilos para la cuadrícula de los botones (CONTENEDOR INTERNO) */
+.shapes-grid {
+    display: grid !important; /* <--- ¡APLICA display: grid AQUÍ! */
+    grid-template-columns: repeat(3, 1fr) !important; /* <--- ¡3 columnas AQUÍ! */
+    gap: 8px !important; /* Espacio entre los botones */
+    
+    /* Para que el grid no se estire más de lo necesario y se ajuste a 3 columnas */
+    width: fit-content !important; 
+    max-width: calc( (44px * 3) + (8px * 2) ) !important; /* (min-width botón * 3) + (gap * 2) */
+    /* Esto es (ancho_min_del_toolbar-btn * 3) + (gap_entre_botones * 2) */
+}
+
+
+/* Las reglas para .shapes-popover .toolbar-btn siguen igual */
+.shapes-popover .toolbar-btn {
+    font-size: 1.5rem;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 4px;
+    background-color: #f8fafc;
+    border: 1px solid #e0e0e0;
+    color: #333;
+}
+
+.shapes-popover .toolbar-btn:hover:not(.active) {
+    background-color: #e2e8f0;
+}
+
+
+/* Estilo para el botón principal que muestra el color actual (la bolita) */
+.toolbar-btn.color-preview-btn {
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 2px solid #ccc;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1);
+}
+
+.toolbar-btn.color-preview-btn:hover {
+    transform: scale(1.05);
+    border-color: #3b82f6;
+}
+
+/* Estilo para el popover del selector de color (el contenedor blanco general) */
+.color-popover {
+    /* Forzamos los estilos para asegurar visibilidad */
+    background-color: #ffffff !important; /* Fondo blanco */
+    padding: 15px !important; /* Padding explícito, no depender de p-3 */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important; /* Sombra */
+    border-radius: 12px !important; /* Bordes redondeados */
+    border: 1px solid #e0e0e0 !important; /* Borde sutil */
+
+    /* Propiedades de layout que ya habíamos puesto */
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+}
+
+/* NUEVO: Estilo para el contenido dentro del popover de color */
+.color-popover-content {
+    display: flex; /* Contenedor principal del popover de color */
+    flex-direction: column;
+    gap: 12px; /* Espacio entre la cuadrícula de colores y el botón "Más colores" */
+    /* Quita cualquier padding que se esté duplicando de .color-popover */
+    /* padding: 15px; ya se maneja por p-3 en renderPopover */
+}
+
+/* Cuadrícula de colores predefinidos */
+.color-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr); /* 5 columnas para las bolitas de color */
+    gap: 8px; /* Espacio entre las bolitas */
+}
+
+/* Bolitas de color individuales */
+.color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1);
+    flex-shrink: 0;
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 2px #3b82f6;
+}
+
+/* Botón "Más colores" */
+.toolbar-btn.custom-color-btn {
+    width: 100%;
+    font-size: 0.9rem;
+    padding: 8px 15px;
+    background-color: #f1f5f9;
+    color: #333;
+    border: 1px solid #e2e8f0;
+}
+
+.toolbar-btn.custom-color-btn:hover {
+    background-color: #e2e8f0;
+    transform: translateY(-1px);
+}
+
+/* Contenedor del color picker (react-colorful) */
+.color-picker-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Estilos para el componente react-colorful (puedes ajustar según tu gusto) */
+.react-colorful-picker {
+    width: 200px !important;
+    height: 150px !important;
+}
+.react-colorful__hue {
+    border-radius: 4px;
+}
+.react-colorful__saturation {
+    border-radius: 4px;
+}
+.react-colorful__pointer {
+    border: 2px solid white !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 0 2px #3b82f6 !important;
+}
+
+
+/* Estilo para el popover de las herramientas de lápiz */
+.pencil-popover {
+    /* Estas propiedades ya deberían estar: */
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    padding: 12px !important;
+    background-color: #ffffff !important; /* Asegura el fondo blanco */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important; /* Sombra */
+    border-radius: 12px !important; /* Bordes redondeados */
+    border: 1px solid #e0e0e0 !important; /* Borde del popover */
+}
+
+/* NUEVO/MODIFICADO: Estilos para los botones dentro del popover del lápiz */
+.pencil-popover .toolbar-btn {
+    /* Sobrescribe los estilos genéricos de .toolbar button para el popover */
+    background-color: #f8fafc !important; /* Fondo gris muy claro (como los de figuras) */
+    color: #333 !important; /* Color de texto/icono oscuro */
+    border: 1px solid #e0e0e0 !important; /* Borde sutil */
+    
+    font-size: 1.5rem; /* Tamaño de los iconos en el popover */
+    min-width: 44px; /* Ancho mínimo para cada botón de herramienta */
+    min-height: 44px; /* Altura mínima */
+    padding: 4px; /* Padding ajustado */
+
+    /* Transiciones, cursor, display flex (ya vienen de .toolbar button general) */
+}
+
+/* Regla para el hover de los botones en el popover (cuando NO están activos) */
+.pencil-popover .toolbar-btn:hover:not(.active) {
+    background-color: #e2e8f0 !important; /* Gris un poco más oscuro al pasar el ratón */
+    transform: translateY(-1px); /* Efecto de "levantar" */
+}
+
+
+/* Estilo para el borde de selección de elementos en el Canvas */
+.selected-element-border {
+    stroke: #3b82f6; /* Azul de selección */
+    stroke-width: 0.1; /* Ancho del borde en unidades SVG */
+    stroke-dasharray: 0.2,0.2; /* Borde punteado */
+    fill: none; /* Sin relleno */
+}
+
+
+
+/* ---------- TEXT BOX (estilo Miro) ---------- */
+.text-box {
+  position: absolute;
+  background-color: #ffffff; /* Fondo blanco */
+  border: 1px solid #e0e0e0; /* Borde sutil */
+  border-radius: 8px; /* Bordes redondeados */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); /* Sombra para "flotar" */
+  padding: 8px 12px; /* Padding interno */
+  cursor: text; /* Cursor de texto por defecto */
+  min-width: 50px; /* Ancho mínimo */
+  min-height: 30px; /* Alto mínimo */
+  box-sizing: border-box; /* Incluye padding y borde en width/height */
+  pointer-events: auto; /* Permite que el div reciba eventos del ratón */
+
+  white-space: pre-wrap; /* Permite saltos de línea y wrapping */
+  word-break: break-word; /* Rompe palabras largas */
+  overflow: hidden; /* Oculta barras de desplazamiento (JS lo gestionará) */
+  
+  font-family: sans-serif;
+  line-height: 1.4;
+  /* El tamaño de fuente se establecerá dinámicamente en JavaScript */
+  color: #111827; /* Color de texto por defecto */
+
+  resize: both; /* <--- HABILITA EL REDIMENSIONAMIENTO NATIVO (vertical y horizontal) */
+  overflow: auto; /* Muestra scrollbars si el contenido excede el tamaño */
+}
+
+/* Placeholder para cuando el texto está vacío */
+.text-box:empty::before {
+  content: attr(data-placeholder);
+  color: #a0a0a0; /* Color gris para el placeholder */
+  pointer-events: none; /* Permite hacer clic "a través" del placeholder */
+  display: block; /* Asegura que el placeholder se muestre */
+}
+
+/* Estilo al enfocar (borde azul como en Miro) */
+.text-box:focus {
+  outline: none; /* Sin contorno nativo */
+  border-color: #3b82f6; /* Borde azul brillante */
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.3); /* Sombra azul para resaltar */
+}
+
+/* Estilo para el recuadro cuando está seleccionado (herramienta 'select' activa) */
+/* Esto se aplica al .text-box directamente */
+.text-box[style*="cursor: grab"] { /* Si el cursor es 'grab', significa que está en modo selección */
+    border-color: #3b82f6; /* Borde azul brillante */
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.3); /* Sombra azul para resaltar */
+}

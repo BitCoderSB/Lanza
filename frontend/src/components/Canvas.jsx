@@ -1,4 +1,4 @@
-import React, { useState, forwardRef, useEffect, useRef, useMemo } from 'react'; // Importar useMemo
+import React, { useState, forwardRef, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid'; // Para generar IDs únicos
 
 export default forwardRef(({
@@ -11,21 +11,24 @@ export default forwardRef(({
   drawColor = '#1e3a8a',
   className = ''
 }, ref) => {
-  const [dragging, setDragging] = useState(false);
-  const [preview, setPreview] = useState(null);
-  const [pathPoints, setPathPoints] = useState([]);
-  const [selectedElementId, setSelectedElementId] = useState(null);
+  const [dragging, setDragging] = useState(false); // Indica si se está arrastrando algo
+  const [preview, setPreview] = useState(null); // Elemento en previsualización al dibujar formas
+  const [pathPoints, setPathPoints] = useState([]); // Puntos para el trazo de lápiz/rotulador
+  const [selectedElementId, setSelectedElementId] = useState(null); // ID del elemento actualmente seleccionado
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 }); // Offset del puntero al inicio del arrastre de un elemento
-  const [pointerGuide, setPointerGuide] = useState(null);
-  const lastAddedId = useRef(null);
-  const SMOOTHING = 0.3;
+  const [pointerGuide, setPointerGuide] = useState(null); // Posición del puntero rojo de guía
+  const lastAddedId = useRef(null); // Para posibles optimizaciones
+  const SMOOTHING = 0.3; // Factor de suavizado para el trazo de lápiz
 
-  const draggingElementRef = useRef(null);
-  const initialPointerPosRef = useRef(null); // Posición del puntero al inicio del drag
-  const initialElementPropsRef = useRef(null); // Propiedades originales del elemento al inicio del drag
-  const initialElementBBoxRef = useRef(null); // BBox inicial del elemento al inicio del drag
+  // Refs para almacenar el estado del arrastre de forma consistente
+  const draggingElementRef = useRef(null); // Almacena el objeto del elemento que se está arrastrando
+  const initialPointerPosRef = useRef(null); // Almacena la posición normalizada del puntero cuando el arrastre comenzó
+  // initialElementPropsRef ya no es necesario, usaremos draggingElementRef.current directamente
+  // const initialElementPropsRef = useRef(null); 
+  const initialElementBBoxRef = useRef(null); // ¡ESTA ES LA DECLARACIÓN CLAVE QUE NECESITAS!
 
 
+  // Resetea el estado de dibujo y selección al cambiar de herramienta
   useEffect(() => {
     setDragging(false);
     setPreview(null);
@@ -34,6 +37,7 @@ export default forwardRef(({
     lastAddedId.current = null;
   }, [tool]);
 
+  // Normaliza las coordenadas del puntero (de píxeles de pantalla a unidades 0-100 del SVG)
   const toNorm = e => {
     const r = ref.current.getBoundingClientRect();
     return {
@@ -42,6 +46,7 @@ export default forwardRef(({
     };
   };
 
+  // Función auxiliar para calcular la caja delimitadora (Bounding Box) de un elemento SVG
   const getBoundingBox = (element) => {
     const selectionPadding = 0.5;
     let minX, minY, maxX, maxY;
@@ -117,16 +122,15 @@ export default forwardRef(({
     const pos = toNorm(e);
     setPointerGuide(pos);
 
-    // NUEVO: Lógica para la goma de borrar
     if (tool === 'eraser') {
       const clickedElement = elements.find(el => {
         const bbox = getBoundingBox(el);
         return isPointInsideBox(pos, bbox);
       });
       if (clickedElement) {
-        onRemove(clickedElement.id); // Llama a onRemove para borrar el elemento
+        onRemove(clickedElement.id);
       }
-      return; // La goma no arrastra ni selecciona
+      return;
     }
 
     if (tool === 'select') {
@@ -143,17 +147,9 @@ export default forwardRef(({
         initialPointerPosRef.current = pos; 
         initialElementBBoxRef.current = getBoundingBox(clickedElement); // GUARDAR EL BBOX INICIAL
 
-        // Guardar las propiedades originales del elemento al inicio del arrastre para la traslación final
-        initialElementPropsRef.current = { 
-            x0: clickedElement.x0, y0: clickedElement.y0, x1: clickedElement.x1, y1: clickedElement.y1,
-            x: clickedElement.x, y: clickedElement.y,
-            points: clickedElement.points ? [...clickedElement.points] : [],
-            translateX: clickedElement.translateX || 0, // Captura la traslación actual
-            translateY: clickedElement.translateY || 0  // Captura la traslación actual
-        };
-
-        // Calcula el offset desde la posición del puntero hasta el origen (x,y) del BBox del elemento
+        // --- CÁLCULO DE dragOffset UNIFICADO (siempre puntero a BBox origen) ---
         setDragOffset({ x: pos.x - initialElementBBoxRef.current.x, y: pos.y - initialElementBBoxRef.current.y });
+        // --- FIN CÁLCULO UNIFICADO ---
 
       } else {
         setSelectedElementId(null);
@@ -202,10 +198,11 @@ export default forwardRef(({
     if (!dragging) return;
 
     if (tool === 'select' && selectedElementId) {
-      const elementToMoveInitialProps = initialElementPropsRef.current; // Propiedades originales
+      const elementToMove = draggingElementRef.current; 
       const initialPointer = initialPointerPosRef.current; // Posición inicial del puntero
+      const initialBBox = initialElementBBoxRef.current; // BBox inicial del elemento
 
-      if (!elementToMoveInitialProps || !initialPointer) {
+      if (!elementToMove || !initialPointer || !initialBBox) {
           console.error("ERROR: Refs de arrastre no inicializados correctamente en handlePointerMove. Saliendo.");
           return;
       }
@@ -213,23 +210,35 @@ export default forwardRef(({
       const newUpdate = { id: selectedElementId };
 
       // Calcular el desplazamiento total del puntero desde su posición inicial
-      const deltaX = pos.x - initialPointer.x;
-      const deltaY = pos.y - initialPointer.y;
+      const deltaPointerX = pos.x - initialPointer.x;
+      const deltaPointerY = pos.y - initialPointer.y;
       
-      if (['pencil', 'marker'].includes(elementToMoveInitialProps.type)) {
-          // PARA LÁPIZ/ROTULADOR: ENVIAR TRANSLACIÓN TEMPORAL (translateX, translateY)
-          newUpdate.translateX = deltaX;
-          newUpdate.translateY = deltaY;
-      } else if (elementToMoveInitialProps.type === 'text') {
-          newUpdate.x = elementToMoveInitialProps.x + deltaX;
-          newUpdate.y = elementToMoveInitialProps.y + deltaY;
+      // La nueva posición deseada del ORIGEN del BBox del elemento
+      // Se calcula la nueva esquina superior izquierda del BBox
+      const newBBoxX = initialBBox.x + deltaPointerX;
+      const newBBoxY = initialBBox.y + deltaPointerY;
+
+      // Calcular el desplazamiento (dx, dy) desde el origen original del elemento
+      // Es decir, cuánto se movió el BBox. Este es el delta que se aplica a las coordenadas del elemento.
+      const dx = newBBoxX - getBoundingBox(elementToMove).x; // Diferencia entre nueva pos BBox y pos BBox original del elemento
+      const dy = newBBoxY - getBoundingBox(elementToMove).y; // Esto compensa el padding de getBoundingBox
+
+
+      if (['pencil', 'marker'].includes(elementToMove.type)) {
+          newUpdate.points = elementToMove.points.map(p => ({
+              x: p.x + dx,
+              y: p.y + dy
+          }));
+      } else if (elementToMove.type === 'text') {
+          newUpdate.x = elementToMove.x + dx;
+          newUpdate.y = elementToMove.y + dy;
       } else { // Para formas (square, circle, triangle, diamond, star, pentagon, arrowRight, arrowLeft, line)
-          newUpdate.x0 = elementToMoveInitialProps.x0 + deltaX;
-          newUpdate.y0 = elementToMoveInitialProps.y0 + deltaY;
-          newUpdate.x1 = elementToMoveInitialProps.x1 + deltaX;
-          newUpdate.y1 = elementToMoveInitialProps.y1 + dy;
+          newUpdate.x0 = elementToMove.x0 + dx;
+          newUpdate.y0 = elementToMove.y0 + dy;
+          newUpdate.x1 = elementToMove.x1 + dx;
+          newUpdate.y1 = elementToMove.y1 + dy;
       }
-      onMove(newUpdate); // Notifica a BoardView sobre el movimiento
+      onMove(newUpdate);
       return;
     }
 
@@ -245,24 +254,7 @@ export default forwardRef(({
     e.target.releasePointerCapture(e.pointerId);
 
     if (dragging) {
-      // Finalizar trazo de lápiz/rotulador (Aplicar la traslación final a los puntos)
-      if (tool === 'select' && selectedElementId && draggingElementRef.current && ['pencil', 'marker'].includes(draggingElementRef.current.type)) {
-        const elementToMoveInitialProps = initialElementPropsRef.current; // Propiedades originales
-        const initialPointer = initialPointerPosRef.current; // Posición inicial del puntero
-        
-        const finalDeltaX = e.clientX - initialPointer.x;
-        const finalDeltaY = e.clientY - initialPointer.y;
-
-        // Calcular los puntos finales aplicando el delta a los puntos originales
-        const updatedPoints = (elementToMoveInitialProps.points || []).map(p => ({
-          x: p.x + finalDeltaX,
-          y: p.y + finalDeltaY
-        }));
-        // Enviar la actualización final y resetear la traslación temporal a 0
-        onMove({ id: selectedElementId, points: updatedPoints, translateX: 0, translateY: 0 }); 
-      }
-      // Finalizar dibujo de nuevo trazo (lápiz/rotulador)
-      else if (['pencil', 'marker'].includes(tool) && pathPoints.length > 1) {
+      if (['pencil', 'marker'].includes(tool) && pathPoints.length > 1) {
         const newEl = {
           id: uuidv4(),
           type: tool,
@@ -272,35 +264,30 @@ export default forwardRef(({
         onAdd(newEl);
         setPathPoints([]);
       }
-      // Finalizar dibujo de forma
       else if (preview) {
         onAdd(preview); 
         setPreview(null);
       }
     }
     setDragging(false);
-    // Limpiar los refs al finalizar el arrastre
     draggingElementRef.current = null;
     initialPointerPosRef.current = null;
     initialElementPropsRef.current = null; 
     initialElementBBoxRef.current = null; 
   };
 
-  // Función para suavizar los puntos (ahora memoizada para optimización)
-  const getSmoothed = useMemo(() => {
-    return (pts) => {
-      if (!pts || pts.length === 0) return [];
-      const sm = [pts[0]];
-      for (let i = 1; i < pts.length; i++) {
-        const prev = sm[i - 1], curr = pts[i];
-        sm.push({
-          x: prev.x + (curr.x - prev.x) * SMOOTHING,
-          y: prev.y + (curr.y - prev.y) * SMOOTHING
-        });
-      }
-      return sm;
-    };
-  }, [SMOOTHING]);
+  const getSmoothed = pts => {
+    if (!pts.length) return [];
+    const sm = [pts[0]];
+    for (let i = 1; i < pts.length; i++) {
+      const prev = sm[i - 1], curr = pts[i];
+      sm.push({
+        x: prev.x + (curr.x - prev.x) * SMOOTHING,
+        y: prev.y + (curr.y - prev.y) * SMOOTHING
+      });
+    }
+    return sm;
+  };
 
   const getDrawingProperties = (toolType, currentColor) => {
     switch (toolType) {
@@ -324,35 +311,19 @@ export default forwardRef(({
     const bbox = getBoundingBox(el);
     const isSelected = el.id === selectedElementId;
 
-    // Calcular la transformación de traslación para el arrastre del lápiz/rotulador
-    // Aplicamos la traslación temporalmente si el elemento es el que se está arrastrando
-    let transform = '';
-    if (isSelected && dragging && draggingElementRef.current?.id === el.id && (el.type === 'pencil' || el.type === 'marker')) {
-        const currentPointer = initialPointerPosRef.current;
-        const initialProps = initialElementPropsRef.current; // Capturamos initialElementPropsRef
-        if (currentPointer && initialProps) { // Asegurarse de que los refs no sean null
-            const dx = toNorm(window.event).x - currentPointer.x; // Delta del puntero desde el inicio
-            const dy = toNorm(window.event).y - currentPointer.y;
-            transform = `translate(${dx} ${dy})`;
-        }
-    } else if (el.translateX || el.translateY) { // Si el elemento tiene una traslación final (del DB)
-        transform = `translate(${el.translateX || 0} ${el.translateY || 0})`;
-    }
-
 
     return (
-      <g key={el.id} transform={transform}> {/* Aplicar la transformación aquí */}
+      <g key={el.id}>
         {el.type === 'square' && <rect x={el.x0} y={el.y0} width={el.x1 - el.x0} height={el.y1 - el.y0} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeOpacity={strokeOpacity} />}
         {el.type === 'circle' && <circle cx={(el.x0 + el.x1) / 2} cy={(el.y0 + el.y1) / 2} r={Math.hypot(el.x1 - el.x0, el.y1 - el.y0) / 2} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeOpacity={strokeOpacity} />}
         {el.type === 'triangle' && <polygon points={`${el.x0},${el.y1} ${(el.x0 + el.x1) / 2},${el.y0} ${el.x1},${el.y1}`} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeOpacity={strokeOpacity} />}
-        {/* Usamos un key simple para polyline. React puede optimizar el diff si el obj el.points cambia referencialmente. */}
-        {['pencil', 'marker'].includes(el.type) && <polyline key={el.id} points={getSmoothed(el.points).map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeOpacity={strokeOpacity} strokeLinejoin="round" strokeLinecap="round" />}
+        {['pencil', 'marker'].includes(el.type) && <polyline key={`${el.id}-${el.points[0]?.x || '0'}-${el.points[0]?.y || '0'}`} points={getSmoothed(el.points).map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeOpacity={strokeOpacity} strokeLinejoin="round" strokeLinecap="round" />}
         {el.type === 'text' && (
             <text
               key={`${el.id}-text`}
               x={el.x}
               y={el.y + (el.height / 2)}
-              fontSize={`${el.fontSize}px`} 
+              fontSize={`${el.fontSize}px`} /* Usa directamente el fontSize de la prop */
               fill={el.color}
               dominantBaseline="middle"
               textAnchor="start"

@@ -11,29 +11,33 @@ export default forwardRef(({
   drawColor = '#1e3a8a',
   className = ''
 }, ref) => {
-  const [dragging, setDragging] = useState(false);
-  const [preview, setPreview] = useState(null);
-  const [pathPoints, setPathPoints] = useState([]);
-  const [selectedElementId, setSelectedElementId] = useState(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [pointerGuide, setPointerGuide] = useState(null);
-  const lastAddedId = useRef(null);
-  const SMOOTHING = 0.3;
+  const [dragging, setDragging] = useState(false); // Indica si se está arrastrando algo
+  const [preview, setPreview] = useState(null); // Elemento en previsualización al dibujar formas
+  const [pathPoints, setPathPoints] = useState([]); // Puntos para el trazo de lápiz/rotulador
+  const [selectedElementId, setSelectedElementId] = useState(null); // ID del elemento actualmente seleccionado
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 }); // Offset del puntero al inicio del arrastre de un elemento
+  const [pointerGuide, setPointerGuide] = useState(null); // Posición del puntero rojo de guía
+  const lastAddedId = useRef(null); // Para posibles optimizaciones
+  const SMOOTHING = 0.3; // Factor de suavizado para el trazo de lápiz
 
-  const draggingElementRef = useRef(null);
-  const initialPointerPosRef = useRef(null);
-  const initialElementPropsRef = useRef(null);
-  const initialElementBBoxRef = useRef(null);
+  // Refs para almacenar el estado del arrastre de forma consistente
+  const draggingElementRef = useRef(null); // Almacena el objeto del elemento que se está arrastrando
+  const initialPointerPosRef = useRef(null); // Almacena la posición normalizada del puntero cuando el arrastre comenzó
+  // initialElementPropsRef ya no es necesario, usaremos draggingElementRef.current directamente
+  // const initialElementPropsRef = useRef(null); 
+  const initialElementBBoxRef = useRef(null); // ¡ESTA ES LA DECLARACIÓN CLAVE QUE NECESITAS!
 
 
+  // Resetea el estado de dibujo y selección al cambiar de herramienta
   useEffect(() => {
     setDragging(false);
     setPreview(null);
     setPathPoints([]);
-    setSelectedElementId(null);
+    setSelectedElementId(null); // Deselecciona al cambiar de herramienta
     lastAddedId.current = null;
   }, [tool]);
 
+  // Normaliza las coordenadas del puntero (de píxeles de pantalla a unidades 0-100 del SVG)
   const toNorm = e => {
     const r = ref.current.getBoundingClientRect();
     return {
@@ -42,6 +46,7 @@ export default forwardRef(({
     };
   };
 
+  // Función auxiliar para calcular la caja delimitadora (Bounding Box) de un elemento SVG
   const getBoundingBox = (element) => {
     const selectionPadding = 0.5;
     let minX, minY, maxX, maxY;
@@ -117,16 +122,15 @@ export default forwardRef(({
     const pos = toNorm(e);
     setPointerGuide(pos);
 
-    // NUEVO: Lógica para la goma de borrar
     if (tool === 'eraser') {
       const clickedElement = elements.find(el => {
         const bbox = getBoundingBox(el);
         return isPointInsideBox(pos, bbox);
       });
       if (clickedElement) {
-        onRemove(clickedElement.id); // Llama a onRemove para borrar el elemento
+        onRemove(clickedElement.id);
       }
-      return; // La goma no arrastra ni selecciona
+      return;
     }
 
     if (tool === 'select') {
@@ -143,18 +147,9 @@ export default forwardRef(({
         initialPointerPosRef.current = pos; 
         initialElementBBoxRef.current = getBoundingBox(clickedElement); // GUARDAR EL BBOX INICIAL
 
-        let offsetX, offsetY;
-        if (['pencil', 'marker'].includes(clickedElement.type)) {
-          offsetX = clickedElement.points.length > 0 ? pos.x - clickedElement.points[0].x : 0;
-          offsetY = clickedElement.points.length > 0 ? pos.y - clickedElement.points[0].y : 0;
-        } else if (clickedElement.type === 'text') {
-          offsetX = pos.x - clickedElement.x;
-          offsetY = pos.y - clickedElement.y;
-        } else { // Formas y líneas
-          offsetX = pos.x - clickedElement.x0;
-          offsetY = pos.y - clickedElement.y0;
-        }
-        setDragOffset({ x: offsetX, y: offsetY });
+        // --- CÁLCULO DE dragOffset UNIFICADO (siempre puntero a BBox origen) ---
+        setDragOffset({ x: pos.x - initialElementBBoxRef.current.x, y: pos.y - initialElementBBoxRef.current.y });
+        // --- FIN CÁLCULO UNIFICADO ---
 
       } else {
         setSelectedElementId(null);
@@ -204,31 +199,44 @@ export default forwardRef(({
 
     if (tool === 'select' && selectedElementId) {
       const elementToMove = draggingElementRef.current; 
-      const initialPointer = initialPointerPosRef.current;
+      const initialPointer = initialPointerPosRef.current; // Posición inicial del puntero
+      const initialBBox = initialElementBBoxRef.current; // BBox inicial del elemento
 
-      if (!elementToMove || !initialPointer) {
+      if (!elementToMove || !initialPointer || !initialBBox) {
           console.error("ERROR: Refs de arrastre no inicializados correctamente en handlePointerMove. Saliendo.");
           return;
       }
 
       const newUpdate = { id: selectedElementId };
 
-      const deltaX = pos.x - initialPointer.x;
-      const deltaY = pos.y - initialPointer.y;
+      // Calcular el desplazamiento total del puntero desde su posición inicial
+      const deltaPointerX = pos.x - initialPointer.x;
+      const deltaPointerY = pos.y - initialPointer.y;
       
+      // La nueva posición deseada del ORIGEN del BBox del elemento
+      // Se calcula la nueva esquina superior izquierda del BBox
+      const newBBoxX = initialBBox.x + deltaPointerX;
+      const newBBoxY = initialBBox.y + deltaPointerY;
+
+      // Calcular el desplazamiento (dx, dy) desde el origen original del elemento
+      // Es decir, cuánto se movió el BBox. Este es el delta que se aplica a las coordenadas del elemento.
+      const dx = newBBoxX - getBoundingBox(elementToMove).x; // Diferencia entre nueva pos BBox y pos BBox original del elemento
+      const dy = newBBoxY - getBoundingBox(elementToMove).y; // Esto compensa el padding de getBoundingBox
+
+
       if (['pencil', 'marker'].includes(elementToMove.type)) {
           newUpdate.points = elementToMove.points.map(p => ({
-              x: p.x + deltaX,
-              y: p.y + deltaY
+              x: p.x + dx,
+              y: p.y + dy
           }));
       } else if (elementToMove.type === 'text') {
-          newUpdate.x = elementToMove.x + deltaX;
-          newUpdate.y = elementToMove.y + deltaY;
+          newUpdate.x = elementToMove.x + dx;
+          newUpdate.y = elementToMove.y + dy;
       } else { // Para formas (square, circle, triangle, diamond, star, pentagon, arrowRight, arrowLeft, line)
-          newUpdate.x0 = elementToMove.x0 + deltaX;
-          newUpdate.y0 = elementToMove.y0 + deltaY;
-          newUpdate.x1 = elementToMove.x1 + deltaX;
-          newUpdate.y1 = elementToMove.y1 + deltaY;
+          newUpdate.x0 = elementToMove.x0 + dx;
+          newUpdate.y0 = elementToMove.y0 + dy;
+          newUpdate.x1 = elementToMove.x1 + dx;
+          newUpdate.y1 = elementToMove.y1 + dy;
       }
       onMove(newUpdate);
       return;
@@ -309,8 +317,6 @@ export default forwardRef(({
         {el.type === 'square' && <rect x={el.x0} y={el.y0} width={el.x1 - el.x0} height={el.y1 - el.y0} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeOpacity={strokeOpacity} />}
         {el.type === 'circle' && <circle cx={(el.x0 + el.x1) / 2} cy={(el.y0 + el.y1) / 2} r={Math.hypot(el.x1 - el.x0, el.y1 - el.y0) / 2} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeOpacity={strokeOpacity} />}
         {el.type === 'triangle' && <polygon points={`${el.x0},${el.y1} ${(el.x0 + el.x1) / 2},${el.y0} ${el.x1},${el.y1}`} fill={fill} stroke={stroke} strokeWidth={strokeWidth} strokeOpacity={strokeOpacity} />}
-        {/* MODIFICACIÓN CLAVE AQUÍ: key del polyline para forzar re-renderizado */}
-        {/* Usamos el primer punto como parte de la key para forzar la actualización si se mueve */}
         {['pencil', 'marker'].includes(el.type) && <polyline key={`${el.id}-${el.points[0]?.x || '0'}-${el.points[0]?.y || '0'}`} points={getSmoothed(el.points).map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeOpacity={strokeOpacity} strokeLinejoin="round" strokeLinecap="round" />}
         {el.type === 'text' && (
             <text

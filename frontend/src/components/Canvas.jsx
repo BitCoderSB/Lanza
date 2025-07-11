@@ -23,9 +23,7 @@ export default forwardRef(({
   // Refs para almacenar el estado del arrastre de forma consistente
   const draggingElementRef = useRef(null); // Almacena el objeto del elemento que se está arrastrando
   const initialPointerPosRef = useRef(null); // Almacena la posición normalizada del puntero cuando el arrastre comenzó
-  // initialElementPropsRef ya no es necesario, usaremos draggingElementRef.current directamente
-  // const initialElementPropsRef = useRef(null); 
-  const initialElementBBoxRef = useRef(null); // ¡ESTA ES LA DECLARACIÓN CLAVE QUE NECESITAS!
+  const initialElementBBoxRef = useRef(null); // Bounding Box inicial del elemento
 
 
   // Resetea el estado de dibujo y selección al cambiar de herramienta
@@ -143,14 +141,12 @@ export default forwardRef(({
         setSelectedElementId(clickedElement.id);
         setDragging(true);
         
+        // Guardamos el estado original del elemento y la posición del puntero
         draggingElementRef.current = clickedElement; 
         initialPointerPosRef.current = pos; 
-        initialElementBBoxRef.current = getBoundingBox(clickedElement); // GUARDAR EL BBOX INICIAL
+        initialElementBBoxRef.current = getBoundingBox(clickedElement);
 
-        // --- CÁLCULO DE dragOffset UNIFICADO (siempre puntero a BBox origen) ---
         setDragOffset({ x: pos.x - initialElementBBoxRef.current.x, y: pos.y - initialElementBBoxRef.current.y });
-        // --- FIN CÁLCULO UNIFICADO ---
-
       } else {
         setSelectedElementId(null);
       }
@@ -195,58 +191,54 @@ export default forwardRef(({
     const pos = toNorm(e);
     setPointerGuide(pos);
 
+    // Si no estamos arrastrando, no hacemos nada más
     if (!dragging) return;
 
+    // --- LÓGICA DE DIBUJO EN TIEMPO REAL ---
+    if (tool === 'pencil' || tool === 'marker') {
+      setPathPoints(prev => [...prev, pos]);
+      return; // Salimos para no ejecutar la lógica de arrastre
+    }
+    if (preview) {
+      setPreview(prev => ({ ...prev, x1: pos.x, y1: pos.y }));
+      return; // Salimos para no ejecutar la lógica de arrastre
+    }
+    
+    // --- LÓGICA DE ARRASTRE (DRAG & DROP) OPTIMIZADA ---
     if (tool === 'select' && selectedElementId) {
-      const elementToMove = draggingElementRef.current; 
-      const initialPointer = initialPointerPosRef.current; // Posición inicial del puntero
-      const initialBBox = initialElementBBoxRef.current; // BBox inicial del elemento
+      const elementToMove = draggingElementRef.current; // El estado ORIGINAL del elemento
+      const initialPointer = initialPointerPosRef.current; // La posición ORIGINAL del puntero
 
-      if (!elementToMove || !initialPointer || !initialBBox) {
-          console.error("ERROR: Refs de arrastre no inicializados correctamente en handlePointerMove. Saliendo.");
-          return;
+      // Asegurarnos que tenemos los datos necesarios
+      if (!elementToMove || !initialPointer) {
+        console.error("Error: Faltan referencias para iniciar el arrastre.");
+        return;
       }
+
+      // 1. Calcular el desplazamiento TOTAL del puntero desde el inicio
+      const deltaX = pos.x - initialPointer.x;
+      const deltaY = pos.y - initialPointer.y;
 
       const newUpdate = { id: selectedElementId };
 
-      // Calcular el desplazamiento total del puntero desde su posición inicial
-      const deltaPointerX = pos.x - initialPointer.x;
-      const deltaPointerY = pos.y - initialPointer.y;
-      
-      // La nueva posición deseada del ORIGEN del BBox del elemento
-      // Se calcula la nueva esquina superior izquierda del BBox
-      const newBBoxX = initialBBox.x + deltaPointerX;
-      const newBBoxY = initialBBox.y + deltaPointerY;
-
-      // Calcular el desplazamiento (dx, dy) desde el origen original del elemento
-      // Es decir, cuánto se movió el BBox. Este es el delta que se aplica a las coordenadas del elemento.
-      const dx = newBBoxX - getBoundingBox(elementToMove).x; // Diferencia entre nueva pos BBox y pos BBox original del elemento
-      const dy = newBBoxY - getBoundingBox(elementToMove).y; // Esto compensa el padding de getBoundingBox
-
-
+      // 2. Aplicar el desplazamiento a las coordenadas ORIGINALES del elemento
       if (['pencil', 'marker'].includes(elementToMove.type)) {
-          newUpdate.points = elementToMove.points.map(p => ({
-              x: p.x + dx,
-              y: p.y + dy
-          }));
+        newUpdate.points = elementToMove.points.map(p => ({
+          x: p.x + deltaX,
+          y: p.y + deltaY
+        }));
       } else if (elementToMove.type === 'text') {
-          newUpdate.x = elementToMove.x + dx;
-          newUpdate.y = elementToMove.y + dy;
-      } else { // Para formas (square, circle, triangle, diamond, star, pentagon, arrowRight, arrowLeft, line)
-          newUpdate.x0 = elementToMove.x0 + dx;
-          newUpdate.y0 = elementToMove.y0 + dy;
-          newUpdate.x1 = elementToMove.x1 + dx;
-          newUpdate.y1 = elementToMove.y1 + dy;
+        newUpdate.x = elementToMove.x + deltaX;
+        newUpdate.y = elementToMove.y + deltaY;
+      } else { // Para formas (cuadrado, círculo, etc.)
+        newUpdate.x0 = elementToMove.x0 + deltaX;
+        newUpdate.y0 = elementToMove.y0 + deltaY;
+        newUpdate.x1 = elementToMove.x1 + deltaX;
+        newUpdate.y1 = elementToMove.y1 + deltaY;
       }
+      
+      // 3. Notificar al componente padre de la nueva posición
       onMove(newUpdate);
-      return;
-    }
-
-    if (['pencil', 'marker'].includes(tool)) {
-      setPathPoints(prev => [...prev, pos]);
-    }
-    else if (preview) {
-      setPreview(prev => ({ ...prev, x1: pos.x, y1: pos.y }));
     }
   };
 
@@ -269,10 +261,10 @@ export default forwardRef(({
         setPreview(null);
       }
     }
+    // Limpiamos todas las referencias y estados de arrastre
     setDragging(false);
     draggingElementRef.current = null;
     initialPointerPosRef.current = null;
-    initialElementPropsRef.current = null; 
     initialElementBBoxRef.current = null; 
   };
 
@@ -483,11 +475,13 @@ export default forwardRef(({
 
       {elements.map(renderElement)}
 
-      {/* Actualiza esta condición para incluir todas las nuevas herramientas de forma */}
+      {/* Renderiza el preview de las formas mientras se dibujan */}
       {['square','circle','triangle','diamond','star','pentagon','arrowRight','arrowLeft','line'].includes(tool) && preview && renderElement(preview)}
 
+      {/* Renderiza el preview del lápiz/marcador mientras se dibuja */}
       {renderLive()}
 
+      {/* Guía roja del puntero */}
       {pointerGuide && (
         <circle cx={pointerGuide.x}
           cy={pointerGuide.y}

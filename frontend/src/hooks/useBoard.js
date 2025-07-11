@@ -6,7 +6,7 @@ export function useBoard(boardId) {
   const [elements, setElements]   = useState([]);
   const [textBoxes, setTextBoxes] = useState([]);
 
-  const API   = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+  const API   = import.meta.env.VITE_BACKEND_URL || 'https://backend-s42i.onrender.com';
   const token = localStorage.getItem('token') || '';
   const authHeaders = {
     'Content-Type': 'application/json',

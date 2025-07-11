@@ -24,6 +24,6 @@ services:
     plan: free
     envVars:
       - key: VITE_BACKEND_URL
-        value: https://backend-8dew.onrender.com/ # URL pública del backend
+        value: https://backend-s42i.onrender.com # URL pública del backend
     # buildArgs: # <--- ¡ELIMINA ESTA SECCIÓN COMPLETA!
     #   - VITE_BACKEND_URL

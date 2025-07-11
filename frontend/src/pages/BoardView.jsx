@@ -5,9 +5,10 @@ import Toolbar from '../components/Toolbar'
 import Canvas from '../components/Canvas'
 import TextBox from '../components/TextBox'
 import ChatSidebar from '../components/ChatSidebar'
-import { useBoard } from '../hooks/useBoard' // <-- ¡CORREGIDO AQUÍ!
+import { useBoard } from '../hooks/useBoard' 
 import { useChat } from '../hooks/useChat'
 import { useHandPointer } from '../hooks/useHandPointer'
+import { useVoiceCommands } from '../hooks/useVoiceCommands'; // NUEVO: Importar el hook de voz
 import { v4 as uuidv4 } from 'uuid';
 
 export default function BoardView() {
@@ -54,6 +55,26 @@ export default function BoardView() {
     onReady: handleHandPointerReady
   })
 
+  // NUEVO: Lógica de comandos de voz
+  const handleVoiceCommand = useCallback((command) => {
+    console.log("[BoardView] Comando de voz reconocido:", command);
+    switch (command.type) {
+      case 'tool':
+        setTool(command.value);
+        break;
+      case 'color':
+        setColor(command.value);
+        break;
+      case 'fontSize':
+        setFontSize(command.value);
+        break;
+      default:
+        console.warn("[BoardView] Tipo de comando de voz no manejado:", command.type);
+    }
+  }, [setTool, setColor, setFontSize]); // Dependencias para useCallback
+
+  const { isListening, startListening, stopListening } = useVoiceCommands(handleVoiceCommand);
+
   // Efecto para el toggle de gestos con la tecla 'v'
   useEffect(() => {
     const onKey = e => {
@@ -68,12 +89,9 @@ export default function BoardView() {
     return () => window.removeEventListener('keydown', onKey)
   }, [gesturesEnabled])
 
-  // NUEVO EFECTO: Para borrar elementos con la tecla 'Delete' o 'Backspace'
+  // Efecto para borrar elementos con la tecla 'Delete' o 'Backspace'
   useEffect(() => {
     const handleDeleteKey = e => {
-      // Solo borrar si la tecla es 'Delete' o 'Backspace'
-      // Y si hay un elemento seleccionado
-      // Y si el foco NO está en un campo de texto editable O si el elemento seleccionado es el que tiene el foco
       const isInputFocused = document.activeElement.tagName === 'INPUT' ||
                              document.activeElement.tagName === 'TEXTAREA' ||
                              document.activeElement.contentEditable === 'true';
@@ -89,7 +107,7 @@ export default function BoardView() {
       ) {
         e.preventDefault();
         removeElement(selectedElementId);
-        setSelectedElementId(null); // Deseleccionar el elemento
+        setSelectedElementId(null);
       }
     };
 
@@ -107,8 +125,10 @@ export default function BoardView() {
         onToggleChat={() => setChatOpen(o => !o)}
         gesturesEnabled={gesturesEnabled}
         onToggleGestures={setGesturesEnabled}
-        currentFontSize={fontSize} // Pasa el tamaño de fuente actual
-        onFontSizeChange={setFontSize} // Pasa la función para cambiar el tamaño de fuente
+        currentFontSize={fontSize}
+        onFontSizeChange={setFontSize}
+        isVoiceListening={isListening} // Pasa el estado de escucha de voz
+        onToggleVoice={isListening ? stopListening : startListening} // Pasa la función para activar/desactivar voz
       />
 
       <div className="relative flex-1">
@@ -125,24 +145,20 @@ export default function BoardView() {
           className="absolute inset-0 w-full h-full"
           elements={elements}
           onAdd={el => addElement({ ...el, color })}
-          onMove={updatedProps => { // onMove ahora recibe las propiedades actualizadas para el elemento
-            // Actualiza el elemento en el estado de 'elements' y lo persiste
+          onMove={updatedProps => {
             updateElement(updatedProps);
-
-            // Si el elemento movido es texto y tiene un TextBox asociado, actualiza también el TextBox local
             const movedTextBox = textBoxes.find(tb => tb.id === updatedProps.id);
             if (movedTextBox) {
-                // Solo actualiza las propiedades de posición si están definidas en updatedProps
                 updateTextBox(movedTextBox.id, { 
                     x: updatedProps.x ?? movedTextBox.x,
                     y: updatedProps.y ?? movedTextBox.y,
-                    width: updatedProps.width ?? movedTextBox.width, // Actualiza width
-                    height: updatedProps.height ?? movedTextBox.height, // Actualiza height
-                    fontSize: updatedProps.fontSize ?? movedTextBox.fontSize // Propaga fontSize
+                    width: updatedProps.width ?? movedTextBox.width,
+                    height: updatedProps.height ?? movedTextBox.height,
+                    fontSize: updatedProps.fontSize ?? movedTextBox.fontSize
                 });
             }
           }}
-          onRemove={removeElement} // Pasa onRemove al Canvas
+          onRemove={removeElement}
           onSelectText={pos => {
             const tempTextId = uuidv4(); 
             addTextBox({
@@ -155,14 +171,14 @@ export default function BoardView() {
               text: '',
               placeholder: 'Escribe algo…',
               color,
-              fontSize: fontSize // Asigna el tamaño de fuente actual al nuevo texto
+              fontSize: fontSize
             });
-            setTool('select'); // Siempre cambiar a herramienta de selección después de añadir un cuadro de texto
+            setTool('select');
           }}
           tool={tool}
           drawColor={color}
-          selectedElementId={selectedElementId} // Pasar el ID del elemento seleccionado al Canvas
-          onSelectElement={setSelectedElementId} // Pasar la función para actualizar el ID seleccionado
+          selectedElementId={selectedElementId}
+          onSelectElement={setSelectedElementId}
         />
 
         {textBoxes.map(box => (
@@ -172,15 +188,12 @@ export default function BoardView() {
             onChange={props => {
               updateTextBox(box.id, props);
 
-              // Determinar el tamaño de fuente a usar: siempre el currentFontSize de BoardView
-              const newFontSizeForElement = fontSize; // Usa el estado 'fontSize' de BoardView
+              const newFontSizeForElement = fontSize;
 
-              // Eliminar si el texto está vacío
               if (props.text.trim() === '') {
                   removeElement(box.id);
                   updateTextBox(box.id, { deleted: true });
               } else {
-                  // Añadir o actualizar el elemento en el Canvas/DB
                   const existingEl = elements.find(el => el.id === box.id);
                   if (!existingEl) {
                       addElement({
@@ -188,11 +201,11 @@ export default function BoardView() {
                           type: 'text',
                           x: props.x ?? box.x,
                           y: props.y ?? box.y,
-                          width: props.width ?? box.width, // Propagar width
-                          height: props.height ?? box.height, // Propagar height
+                          width: props.width ?? box.width,
+                          height: props.height ?? box.height,
                           text: props.text,
                           color: props.color ?? box.color,
-                          fontSize: newFontSizeForElement // Usa el nuevo tamaño de fuente de la Toolbar
+                          fontSize: newFontSizeForElement
                       });
                   } else {
                       updateElement({
@@ -204,12 +217,12 @@ export default function BoardView() {
                           height: props.height ?? box.height,
                           text: props.text,
                           color: props.color ?? box.color,
-                          fontSize: newFontSizeForElement // Usa el nuevo tamaño de fuente de la Toolbar
+                          fontSize: newFontSizeForElement
                       });
                   }
               }
             }}
-            tool={tool} /* Pasa la herramienta actual al TextBox */
+            tool={tool}
           />
         ))}
       </div>

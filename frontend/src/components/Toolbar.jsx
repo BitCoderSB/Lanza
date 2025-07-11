@@ -11,7 +11,9 @@ export default function Toolbar({
   gesturesEnabled,
   onToggleGestures,
   currentFontSize,
-  onFontSizeChange
+  onFontSizeChange,
+  isVoiceListening, // NUEVO: Prop para saber si está escuchando
+  onToggleVoice // NUEVO: Prop para activar/desactivar voz
 }) {
   const [shapesOpen, setShapesOpen] = useState(false)
   const [colorOpen, setColorOpen]   = useState(false)
@@ -101,8 +103,7 @@ export default function Toolbar({
     { type: 'marker', label: '🖍️', title: 'Rotulador' },
   ];
 
-  // NUEVO: Herramienta de goma
-  const eraserTool = { type: 'eraser', label: '🧽', title: 'Goma de Borrar' }; // Usamos un emoji de esponja/goma
+  const eraserTool = { type: 'eraser', label: '🧽', title: 'Goma de Borrar' };
 
   const fontSizes = [12, 14, 16, 18, 24, 32, 48];
 
@@ -181,8 +182,17 @@ export default function Toolbar({
         )}
       </div>
 
-      {/* NUEVO: Botón de Goma de Borrar */}
+      {/* Botón de Goma de Borrar */}
       <button className={`toolbar-btn ${tool===eraserTool.type?'active':''}`} onClick={()=>onToolSelect(eraserTool.type)} title={eraserTool.title}>{eraserTool.label}</button>
+
+      {/* NUEVO: Botón para activar/desactivar el reconocimiento de voz */}
+      <button 
+        className={`toolbar-btn ${isVoiceListening?'active-voice':''}`} 
+        onClick={onToggleVoice} 
+        title={isVoiceListening ? "Desactivar Voz" : "Activar Voz"}
+      >
+        🎤
+      </button>
 
 
       {/* SELECTOR DE COLOR MEJORADO */}

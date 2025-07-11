@@ -9,29 +9,34 @@ export default forwardRef(({
   onSelectText,
   tool = 'select',
   drawColor = '#1e3a8a',
-  className = ''
+  className = '',
+  // NUEVO: Props para manejar el elemento seleccionado desde el padre (BoardView)
+  selectedElementId,
+  onSelectElement,
 }, ref) => {
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState(null);
   const [pathPoints, setPathPoints] = useState([]);
-  const [selectedElementId, setSelectedElementId] = useState(null);
+  // ELIMINADO: El estado del elemento seleccionado ahora es manejado por BoardView
+  // const [selectedElementId, setSelectedElementId] = useState(null); 
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [pointerGuide, setPointerGuide] = useState(null);
   const SMOOTHING = 0.3;
 
-  // Refs para el estado del arrastre
   const draggingElementRef = useRef(null);
   const initialPointerPosRef = useRef(null);
   const initialElementBBoxRef = useRef(null);
-  // NUEVO: Ref para el elemento del DOM que se está arrastrando
   const domElementRef = useRef(null);
 
+  // MODIFICADO: Al cambiar de herramienta, se notifica al padre para deseleccionar
   useEffect(() => {
     setDragging(false);
     setPreview(null);
     setPathPoints([]);
-    setSelectedElementId(null);
-  }, [tool]);
+    if (onSelectElement) {
+        onSelectElement(null);
+    }
+  }, [tool, onSelectElement]);
 
   const toNorm = e => {
     const r = ref.current.getBoundingClientRect();
@@ -111,7 +116,7 @@ export default forwardRef(({
            point.y >= box.y && point.y <= (box.y + box.height);
   };
 
-  // MODIFICADO: para guardar la referencia al DOM
+  // MODIFICADO: Usa onSelectElement en lugar de setSelectedElementId
   const handlePointerDown = e => {
     e.target.setPointerCapture(e.pointerId);
     const pos = toNorm(e);
@@ -126,16 +131,15 @@ export default forwardRef(({
     if (tool === 'select') {
       const clickedElement = elements.find(el => isPointInsideBox(pos, getBoundingBox(el)));
       if (clickedElement) {
-        setSelectedElementId(clickedElement.id);
+        onSelectElement(clickedElement.id); // <--- CAMBIO
         setDragging(true);
         draggingElementRef.current = clickedElement;
         initialPointerPosRef.current = pos;
-        // Guardamos el nodo del DOM
         domElementRef.current = ref.current.querySelector(`[data-id="${clickedElement.id}"]`);
         initialElementBBoxRef.current = getBoundingBox(clickedElement);
         setDragOffset({ x: pos.x - initialElementBBoxRef.current.x, y: pos.y - initialElementBBoxRef.current.y });
       } else {
-        setSelectedElementId(null);
+        onSelectElement(null); // <--- CAMBIO
       }
       return;
     }
@@ -153,7 +157,6 @@ export default forwardRef(({
       return;
     }
     
-    // Lógica para empezar a dibujar formas o trazos
     setDragging(true);
     if (['pencil', 'marker'].includes(tool)) {
       setPathPoints([pos]);
@@ -168,13 +171,11 @@ export default forwardRef(({
     }
   };
 
-  // MODIFICADO: para usar transform en lugar de actualizar el estado
   const handlePointerMove = e => {
     const pos = toNorm(e);
     setPointerGuide(pos);
     if (!dragging) return;
 
-    // Si estamos dibujando, actualizamos el preview
     if (tool !== 'select') {
         if (['pencil', 'marker'].includes(tool)) {
             setPathPoints(prev => [...prev, pos]);
@@ -184,7 +185,6 @@ export default forwardRef(({
         return;
     }
     
-    // Si estamos seleccionando, movemos el elemento con transform
     if (domElementRef.current) {
       const initialPointer = initialPointerPosRef.current;
       const deltaX = pos.x - initialPointer.x;
@@ -193,11 +193,9 @@ export default forwardRef(({
     }
   };
 
-  // MODIFICADO: para actualizar el estado de React al final y limpiar
   const handlePointerUp = e => {
     e.target.releasePointerCapture(e.pointerId);
 
-    // Si estábamos arrastrando un elemento, calculamos su posición final y actualizamos el estado
     if (tool === 'select' && dragging && draggingElementRef.current) {
         const elementToMove = draggingElementRef.current;
         const initialPointer = initialPointerPosRef.current;
@@ -222,12 +220,10 @@ export default forwardRef(({
         }
     }
     
-    // Limpiamos la transformación del DOM para que React tome el control
     if (domElementRef.current) {
         domElementRef.current.removeAttribute('transform');
     }
 
-    // Si estábamos dibujando un nuevo elemento, lo añadimos
     if (dragging && tool !== 'select') {
       if (['pencil', 'marker'].includes(tool) && pathPoints.length > 1) {
         onAdd({ id: uuidv4(), type: tool, points: pathPoints, color: drawColor });
@@ -236,7 +232,6 @@ export default forwardRef(({
       }
     }
 
-    // Reseteo final de estados y refs
     setDragging(false);
     draggingElementRef.current = null;
     initialPointerPosRef.current = null;
@@ -245,7 +240,6 @@ export default forwardRef(({
     setPathPoints([]);
     setPreview(null);
   };
-
 
   const getSmoothed = pts => {
     if (!pts.length) return [];
@@ -269,13 +263,13 @@ export default forwardRef(({
     }
   };
 
-  // MODIFICADO: para añadir data-id a cada elemento
+  // MODIFICADO: usa la prop selectedElementId
   const renderElement = el => {
     const { strokeWidth, strokeOpacity, strokeColor } = getDrawingProperties(el.type, el.color || drawColor);
     const stroke = strokeColor;
     const fill = "none";
     const bbox = getBoundingBox(el);
-    const isSelected = el.id === selectedElementId;
+    const isSelected = el.id === selectedElementId; // <--- CAMBIO
 
     return (
       <g key={el.id} data-id={el.id}>
